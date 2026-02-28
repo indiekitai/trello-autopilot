@@ -1,6 +1,6 @@
 {
   "name": "@indiekitai/trello-autopilot",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Trello bug auto-fix CLI — scans bug cards, invokes coding agents, moves fixed cards to Done",
   "type": "module",
   "main": "dist/index.js",

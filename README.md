@@ -1,6 +1,16 @@
 # @indiekitai/trello-autopilot
 
-Trello bug auto-fix CLI — scans bug cards from a Trello board, invokes a coding agent (e.g. Claude Code) to fix them, then moves fixed cards to "Done" with a summary comment.
+Trello bug auto-fix CLI — scans bug cards from a Trello board, invokes a coding agent (e.g. Claude Code) to fix them, runs tests to verify, manages git branches/PRs, and moves fixed cards to "Done" with a summary comment.
+
+## Features (v0.2.0)
+
+- **Test verification** — auto-runs `npm test` or `pytest` after fix; failed tests → card gets "fix-failed" label + failure details comment
+- **Git integration** — creates `fix/card-{id}` branches, generates diff summaries, `--pr` mode for pull requests via `gh` CLI, `git blame` analysis
+- **Priority sorting** — processes cards by label priority: critical > high > medium > low
+- **Smart filtering** — `--label critical` to fix only specific labels, `--limit N` to cap count
+- **Failure handling** — failed fixes get "needs-human" label + detailed comment with suggestions
+- **Retry** — `--retry` to re-attempt previously failed cards (fix-failed / needs-human)
+- **Reporting** — summary report with fix/fail/skip counts and timing; `--json` for structured output; `--webhook` to POST results
 
 ## Install
 
@@ -23,16 +33,25 @@ export TRELLO_TOKEN="your-token"
 
 ```bash
 # Fix all bugs on "Cutie" board
-trello-autopilot --board "Cutie" --list "Bugs" --done "Done" --repo /path/to/repo
+trello-autopilot --board "Cutie" --repo /path/to/repo
+
+# Fix only critical bugs, max 3
+trello-autopilot --board "Cutie" --label critical --limit 3
+
+# Create PRs instead of pushing to main
+trello-autopilot --board "Cutie" --repo ./myapp --pr
+
+# Retry previously failed cards
+trello-autopilot --board "Cutie" --repo ./myapp --retry
+
+# Custom test command
+trello-autopilot --board "Cutie" --repo ./myapp --test-command "make test"
+
+# JSON output + webhook notification
+trello-autopilot --board "Cutie" --json --webhook https://hooks.slack.com/xxx
 
 # Preview only (no changes)
-trello-autopilot --board "Cutie" --list "Bugs" --dry-run
-
-# JSON output for programmatic use
-trello-autopilot --board "Cutie" --list "Bugs" --dry-run --json
-
-# Custom coding agent
-trello-autopilot --board "Cutie" --repo ./myapp --agent "opencode"
+trello-autopilot --board "Cutie" --dry-run
 ```
 
 ### Options
@@ -46,7 +65,29 @@ trello-autopilot --board "Cutie" --repo ./myapp --agent "opencode"
 | `--agent` | `-a` | `"claude"` | Coding agent CLI command |
 | `--dry-run` | | `false` | Preview only |
 | `--json` | | `false` | JSON output |
+| `--limit` | `-n` | all | Max cards to process |
+| `--label` | | all | Only fix cards with this label |
+| `--pr` | | `false` | Create PR via `gh` CLI |
+| `--retry` | | `false` | Retry fix-failed/needs-human cards |
+| `--test-command` | `-t` | auto-detect | Custom test command |
+| `--webhook` | `-w` | | POST results to URL |
 | `--help` | `-h` | | Show help |
+
+## How It Works
+
+1. Connects to Trello and finds the specified board/list
+2. Sorts cards by priority labels (critical > high > medium > low)
+3. Applies filters (`--label`, `--limit`, `--retry`)
+4. For each card:
+   - Creates a git branch `fix/card-{id}`
+   - Runs `git blame` analysis for context
+   - Invokes the coding agent with card details as prompt
+   - Runs tests (`npm test` / `pytest` / custom command)
+   - **If tests pass:** commits, pushes (or creates PR with `--pr`), moves card to Done
+   - **If tests fail:** adds "fix-failed" label + failure comment, does NOT move card
+   - **If agent fails:** adds "needs-human" label + detailed failure comment
+5. Outputs summary report (or JSON with `--json`)
+6. Sends webhook if `--webhook` is configured
 
 ## MCP Server
 
@@ -71,31 +112,42 @@ Use as an MCP tool server for AI agents:
 
 | Tool | Description |
 |------|-------------|
-| `scan_bugs` | Scan a Trello list for bug cards with comments |
-| `fix_bug` | Fix a specific bug card via coding agent |
+| `scan_bugs` | Scan a Trello list for bug cards (with priority sorting & filtering) |
+| `fix_bug` | Fix a specific bug card with test verification and git integration |
 | `move_card` | Move a card to another list with optional comment |
+| `retry_failed` | Retry previously failed cards (fix-failed/needs-human) |
+| `get_report` | Run autopilot and return a structured report |
 
 ## Programmatic API
 
 ```typescript
-import { TrelloClient, scanBugs, fixBug } from "@indiekitai/trello-autopilot";
+import {
+  TrelloClient,
+  scanBugs,
+  fixBug,
+  sortByPriority,
+  filterByLabel,
+  generateReport,
+} from "@indiekitai/trello-autopilot";
 
 const client = new TrelloClient({
   apiKey: process.env.TRELLO_API_KEY!,
   token: process.env.TRELLO_TOKEN!,
 });
 
-const bugs = await scanBugs(client, "Cutie", "Bugs");
-console.log(`Found ${bugs.length} bugs`);
+let bugs = await scanBugs(client, "Cutie", "Bugs");
+bugs = sortByPriority(bugs);
+bugs = filterByLabel(bugs, "critical");
+console.log(`Found ${bugs.length} critical bugs`);
 ```
 
-## How It Works
+## Labels Used
 
-1. Connects to Trello and finds the specified board/list
-2. Reads each card's title, description, comments, and labels
-3. Builds a prompt and invokes a coding agent (Claude Code by default)
-4. On success: moves the card to "Done" and adds a comment with the fix summary
-5. Reports results (or outputs JSON with `--json`)
+| Label | Meaning |
+|-------|---------|
+| `critical` / `high` / `medium` / `low` | Priority for sorting |
+| `fix-failed` | Auto-fix was applied but tests failed |
+| `needs-human` | Auto-fix failed completely, needs manual intervention |
 
 ## License
 

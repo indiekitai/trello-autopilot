@@ -28,6 +28,13 @@ export interface TrelloBoard {
   name: string;
 }
 
+export interface TrelloLabel {
+  id: string;
+  name: string;
+  color: string;
+  idBoard: string;
+}
+
 export interface TrelloClientOpts {
   apiKey: string;
   token: string;
@@ -98,5 +105,46 @@ export class TrelloClient {
     await this.req(`/cards/${cardId}/actions/comments?text=${encodeURIComponent(text)}`, {
       method: "POST",
     });
+  }
+
+  /** Get labels on a board. */
+  async getBoardLabels(boardId: string): Promise<TrelloLabel[]> {
+    return this.req<TrelloLabel[]>(`/boards/${boardId}/labels?fields=name,color`);
+  }
+
+  /** Add a label to a card. Creates the label on the board if it doesn't exist. */
+  async addLabel(cardId: string, boardId: string, labelName: string): Promise<void> {
+    const labels = await this.getBoardLabels(boardId);
+    let label = labels.find((l) => l.name.toLowerCase() === labelName.toLowerCase());
+    if (!label) {
+      // Create label on board
+      label = await this.req<TrelloLabel>(
+        `/boards/${boardId}/labels?name=${encodeURIComponent(labelName)}&color=red`,
+        { method: "POST" }
+      );
+    }
+    try {
+      await this.req(`/cards/${cardId}/idLabels?value=${label.id}`, { method: "POST" });
+    } catch {
+      // Label may already be on card
+    }
+  }
+
+  /** Remove a label from a card by label name. */
+  async removeLabel(cardId: string, boardId: string, labelName: string): Promise<void> {
+    const labels = await this.getBoardLabels(boardId);
+    const label = labels.find((l) => l.name.toLowerCase() === labelName.toLowerCase());
+    if (label) {
+      try {
+        await this.req(`/cards/${cardId}/idLabels/${label.id}`, { method: "DELETE" });
+      } catch {
+        // Label may not be on card
+      }
+    }
+  }
+
+  /** Get a single card by ID. */
+  async getCard(cardId: string): Promise<TrelloCard> {
+    return this.req<TrelloCard>(`/cards/${cardId}?fields=name,desc,idList,labels,url`);
   }
 }
