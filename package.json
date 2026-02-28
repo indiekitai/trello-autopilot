@@ -1,0 +1,36 @@
+{
+  "name": "@indiekitai/trello-autopilot",
+  "version": "0.1.0",
+  "description": "Trello bug auto-fix CLI — scans bug cards, invokes coding agents, moves fixed cards to Done",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "trello-autopilot": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "mcp": "tsx src/mcp.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["trello", "bug-fix", "automation", "cli", "mcp", "ai-agent"],
+  "author": "IndieKit <hello@indiekit.ai>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/indiekitai/trello-autopilot.git"
+  },
+  "files": ["dist"],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
