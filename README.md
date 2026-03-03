@@ -1,3 +1,5 @@
+[English](README.md) | [中文](README.zh-CN.md)
+
 # @indiekitai/trello-autopilot
 
 Trello bug auto-fix CLI — scans bug cards from a Trello board, invokes a coding agent (e.g. Claude Code) to fix them, runs tests to verify, manages git branches/PRs, and moves fixed cards to "Done" with a summary comment.
